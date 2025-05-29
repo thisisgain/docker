@@ -1,4 +1,4 @@
-FROM catchdigital/php:8.3.10-fpm
+FROM thisisgain/php:0.0.1-fpm
 
 # Install xdebug
 RUN pecl install xdebug \
