@@ -42,21 +42,46 @@ RUN apt install -y \
   docker-php-ext-install -j${NPROC} gd zip && \
   apt-get remove -y libfreetype6-dev libpng-dev libfreetype6-dev
 
+# Add Python 2.7 from archive
+RUN echo "deb http://archive.debian.org/debian/ stretch main" > /etc/apt/sources.list.d/stretch.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python2.7 \
+    python2.7-dev \
+    curl
+
+# Add symbolic link for python command
+RUN ln -s /usr/bin/python2.7 /usr/bin/python2
+
 # Install BCMath
 RUN docker-php-ext-install bcmath
 
 # Upadte memory limit for php
 RUN echo "memory_limit = 512M" > /usr/local/etc/php/conf.d/memory-limit.ini
 
-# Install node and npm
-## Download and import the Nodesource GPG key
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-## Create deb repository
-RUN NODE_MAJOR=20 &&\
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-## Run Update and Install
-RUN apt update && apt install -y nodejs
+# Install NVM, Node.js and NPM
+ENV NVM_DIR=/usr/local/.nvm
+ARG DEFAULT_NODE_VERSION=20.18.1
+ENV NODE_VERSION=${DEFAULT_NODE_VERSION}
+
+RUN mkdir -p $NVM_DIR && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
+    . $NVM_DIR/nvm.sh && \
+    nvm install $NODE_VERSION && \
+    nvm alias default $NODE_VERSION && \
+    nvm use default
+
+# Copy the Node.js version switching script
+COPY node-version-switch.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/node-version-switch.sh
+
+# Add NVM to system profile and source the version switching script
+RUN echo "export NVM_DIR=\"$NVM_DIR\"" >> /etc/bash.bashrc && \
+    echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> /etc/bash.bashrc && \
+    echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> /etc/bash.bashrc && \
+    echo '[ -f /usr/local/bin/node-version-switch.sh ] && . /usr/local/bin/node-version-switch.sh' >> /etc/bash.bashrc
+
+ENV PATH=$NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
 
 ## Install tools
 # Install aws cli v2
@@ -75,15 +100,11 @@ RUN unzip awscliv2.zip && \
     ./aws/install
 
 # Install aws eb cli
-# RUN git clone https://github.com/aws/aws-elastic-beanstalk-cli-setup.git
-# RUN apt install -y python3-virtualenv
-# RUN python3 ./aws-elastic-beanstalk-cli-setup/scripts/ebcli_installer.py
-# ENV PATH=/root/.ebcli-virtual-env/executables:${PATH}
-RUN pip install awsebcli --upgrade --user --break-system-packages
+RUN pip3 install awsebcli --upgrade --break-system-packages
 
 # Install Ansible
-RUN python3 -m pip install --user ansible-core --break-system-packages
-ENV PATH=/root/.local/bin:${PATH}
+RUN pip3 install ansible-core --break-system-packages
+ENV PATH=/usr/local:${PATH}
 
 # Clean up aws files.
 RUN rm -Rf awscliv2.zip aws
