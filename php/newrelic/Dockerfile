@@ -1,24 +1,15 @@
-FROM thisisgain/php:8.3.10-fpm
+FROM thisisgain/php:8.3.21-fpm
 
 ## Install required packages.
-RUN apt-get update && apt-get install -y git golang
+RUN apt-get update && apt-get install -y curl
 
-RUN git clone https://github.com/newrelic/newrelic-php-agent.git /var/www/newrelic-php-agent
+## Install New Relic PHP agent
+RUN curl -L https://download.newrelic.com/php_agent/archive/10.21.0.11/newrelic-php5-10.21.0.11-linux.tar.gz -o /tmp/newrelic.tar.gz && \
+    tar -xzf /tmp/newrelic.tar.gz -C /tmp && \
+    cd /tmp/newrelic-php5-* && \
+    ./newrelic-install install && \
+    rm -rf /tmp/newrelic*
 
-WORKDIR /var/www/newrelic-php-agent
+## Copy New Relic configuration
+COPY newrelic.ini /usr/local/etc/php/conf.d/newrelic.ini
 
-# Manually install newrelic agent.
-RUN make all && \
-    make agent-install && \
-    mkdir /var/log/newrelic && \
-    chmod 777 /var/log/newrelic && \
-    mkdir -p /etc/php.d && \
-    cp agent/scripts/newrelic.ini.template /etc/php.d/newrelic.ini && \
-    cp bin/daemon /usr/bin/newrelic-daemon
-
-RUN apt-get remove -y git golang
-
-# Clean up.
-RUN apt-get -y autoremove && apt-get -y clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /var/www/newrelic-php-agent
