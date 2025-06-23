@@ -1,0 +1,10 @@
+[newrelic]
+newrelic.enabled=false
+newrelic.appname = APPNAME
+newrelic.license = LICENSE
+newrelic.daemon.address = DAEMON_ADDRESS
+newrelic.transaction_tracer.record_sql = "obfuscated"
+newrelic.transaction_tracer.explain_enabled = false
+newrelic.transaction_tracer.explain_threshold = 500
+newrelic.capture_params = false
+newrelic.ignored_params = ""

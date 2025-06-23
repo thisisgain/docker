@@ -1,15 +1,14 @@
 FROM thisisgain/php:8.3.21-fpm
 
-## Install required packages.
-RUN apt-get update && apt-get install -y curl
+# Install New Relic PHP agent via package manager
+RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-11.9.0.23-linux.tar.gz | tar -C /tmp -zx \
+    && export NR_INSTALL_USE_CP_NOT_LN=1 \
+    && export NR_INSTALL_SILENT=1 \
+    && /tmp/newrelic-php5-*/newrelic-install install
 
-## Install New Relic PHP agent
-RUN curl -L https://download.newrelic.com/php_agent/archive/10.21.0.11/newrelic-php5-10.21.0.11-linux.tar.gz -o /tmp/newrelic.tar.gz && \
-    tar -xzf /tmp/newrelic.tar.gz -C /tmp && \
-    cd /tmp/newrelic-php5-* && \
-    ./newrelic-install install && \
-    rm -rf /tmp/newrelic*
+# Copy template and entrypoint
+COPY ../newrelic.ini.template /newrelic/newrelic.ini.template
+COPY ../entrypoint.sh /usr/local/bin/entrypoint.sh
 
-## Copy New Relic configuration
-COPY newrelic.ini /usr/local/etc/php/conf.d/newrelic.ini
-
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]

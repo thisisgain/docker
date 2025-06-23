@@ -71,3 +71,5 @@ jobs:
           tags: |
             thisisgain/${{ matrix.service }}:latest
             thisisgain/${{ matrix.service }}:${{ steps.get-version.outputs.VERSION }}
+          labels: |
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/${{ matrix.service }}/README.md
