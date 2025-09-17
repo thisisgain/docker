@@ -1,4 +1,4 @@
-FROM thisisgain/php:8.3.21-fpm
+FROM thisisgain/php:8.4.12-fpm
 
 # Install New Relic PHP agent via package manager
 RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-11.9.0.23-linux.tar.gz | tar -C /tmp -zx \
