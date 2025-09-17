@@ -71,5 +71,11 @@ jobs:
           tags: |
             thisisgain/${{ matrix.service }}:latest
             thisisgain/${{ matrix.service }}:${{ steps.get-version.outputs.VERSION }}
-          labels: |
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/main/${{ matrix.service }}/README.md
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: thisisgain/docker
+          readme-filepath: ./${{ matrix.service }}/README.md
