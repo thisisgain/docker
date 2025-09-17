@@ -1,5 +1,5 @@
-FROM php:8.3-fpm
-LABEL org.opencontainers.image.authors="a.contreras@catchdigital.com"
+FROM php:8.4-fpm
+LABEL org.opencontainers.image.authors="alberto.contreras@thisisgain.com"
 
 # Get build target.
 ARG TARGETPLATFORM
@@ -23,6 +23,8 @@ RUN apt update \
     ssh \
     python3 \
     python3-pip \
+    python3-venv \
+    python3-virtualenv \
     zip \
     libzip-dev \
     gnupg2 \
@@ -50,8 +52,9 @@ RUN echo "deb http://archive.debian.org/debian/ stretch main" > /etc/apt/sources
     python2.7-dev \
     curl
 
-# Add symbolic link for python command
-RUN ln -s /usr/bin/python2.7 /usr/bin/python2
+# Add symbolic links for python commands
+RUN ln -s /usr/bin/python2.7 /usr/bin/python2 && \
+    ln -s /usr/bin/python3 /usr/bin/python
 
 # Install BCMath
 RUN docker-php-ext-install bcmath
@@ -99,8 +102,11 @@ esac
 RUN unzip awscliv2.zip && \
     ./aws/install
 
-# Install aws eb cli
-RUN pip3 install awsebcli --upgrade --break-system-packages
+# Install pipx and aws eb cli
+RUN git clone https://github.com/aws/aws-elastic-beanstalk-cli-setup.git && \
+    python3 ./aws-elastic-beanstalk-cli-setup/scripts/ebcli_installer.py && \
+    rm -Rf aws-elastic-beanstalk-cli-setup && \
+    ln -s /root/.ebcli-virtual-env/executables/eb /usr/local/bin/eb
 
 # Install Ansible
 RUN pip3 install ansible-core --break-system-packages
@@ -132,3 +138,8 @@ ENV PATH=/var/www/vendor/bin:${PATH}
 RUN usermod -u 1000 www-data && \
    usermod -g users www-data && \
    chown -R www-data:www-data /var/www
+
+# Copy and set entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
