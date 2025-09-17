@@ -6,8 +6,6 @@ switch_node_version() {
     # Get current version without the "v" prefix
     CURRENT_VERSION=$(node -v 2>/dev/null | sed "s/^v//")
 
-    echo "****** $NODE_VERSION $CURRENT_VERSION"
-
     # Check if versions are different (accounting for version format differences)
     if [[ "$CURRENT_VERSION" != "$NODE_VERSION"* ]]; then
       echo "Switching from Node.js $CURRENT_VERSION to $NODE_VERSION"
