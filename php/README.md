@@ -1,8 +1,8 @@
 # PHP Docker Image
 
 ## PHP Version
-- **Base Image**: `php:8.3.22-fpm`
-- **PHP Version**: 8.3.22-fpm
+- **Base Image**: `php:8.4.12-fpm`
+- **PHP Version**: 8.4.12-fpm
 
 ## Installed Extensions
 - gd, mbstring, opcache, pdo, pdo_mysql, pdo_pgsql, zip, ldap, bz2
@@ -11,7 +11,7 @@
 
 ## NewRelic Setup
 
-NewRelic PHP agent (v11.9.0.23) is pre-installed but **disabled by default**.
+NewRelic PHP agent (v12.1.0.26) is pre-installed but **disabled by default**.
 
 ### Environment Variables
 
