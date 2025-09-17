@@ -1,4 +1,4 @@
-FROM thisisgain/php:0.0.1-fpm
+FROM thisisgain/php:8.4.12-fpm
 
 # Install xdebug
 RUN pecl install xdebug \
