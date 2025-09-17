@@ -1,4 +1,4 @@
-FROM php:8.3.22-fpm
+FROM php:8.4.12-fpm
 
 ARG TARGETPLATFORM
 
@@ -28,23 +28,8 @@ RUN apt-get install libmemcached-dev -y \
   && docker-php-ext-enable memcached
 
 # Install imagick
-# RUN apt-get install -y libmagickwand-6.q16-dev --no-install-recommends \
-#   && ln -s /usr/lib/$LIBDIR/ImageMagick-6.8.9/bin-Q16/MagickWand-config /usr/bin \
-#   && pecl install imagick \
-#   && echo "extension=imagick.so" > /usr/local/etc/php/conf.d/ext-imagick.ini
-
-# Imagick is installed from the archive because regular installation fails
-# See: https://github.com/Imagick/imagick/issues/643#issuecomment-1834361716
-ARG IMAGICK_VERSION=3.7.0
-RUN curl -L -o /tmp/imagick.tar.gz https://github.com/Imagick/imagick/archive/refs/tags/${IMAGICK_VERSION}.tar.gz \
-    && tar --strip-components=1 -xf /tmp/imagick.tar.gz \
-    && phpize \
-    && ./configure \
-    && make \
-    && make install \
-    && echo "extension=imagick.so" > /usr/local/etc/php/conf.d/ext-imagick.ini \
-    && rm -rf /tmp/*
-    # <<< End of Imagick installation
+RUN pecl install imagick \
+    && docker-php-ext-enable imagick
 
 # set recommended PHP.ini settings
 # see https://secure.php.net/manual/en/opcache.installation.php
@@ -58,7 +43,7 @@ RUN { \
 } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
 # Install New Relic PHP agent via package manager
-RUN curl -L https://download.newrelic.com/php_agent/release/newrelic-php5-11.9.0.23-linux.tar.gz | tar -C /tmp -zx \
+RUN curl -L https://download.newrelic.com/php_agent/archive/12.1.0.26/newrelic-php5-12.1.0.26-linux.tar.gz | tar -C /tmp -zx \
     && export NR_INSTALL_USE_CP_NOT_LN=1 \
     && export NR_INSTALL_SILENT=1 \
     && /tmp/newrelic-php5-*/newrelic-install install
