@@ -8,7 +8,6 @@ switch_node_version() {
 
     # Check if versions are different (accounting for version format differences)
     if [[ "$CURRENT_VERSION" != "$NODE_VERSION"* ]]; then
-      echo "Switching from Node.js $CURRENT_VERSION to $NODE_VERSION"
       . "$NVM_DIR/nvm.sh"
       nvm install "$NODE_VERSION" >/dev/null 2>&1
       nvm use "$NODE_VERSION" >/dev/null 2>&1

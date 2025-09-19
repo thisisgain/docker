@@ -1,4 +1,4 @@
-FROM php:8.4-fpm
+FROM php:8.3-fpm
 LABEL org.opencontainers.image.authors="alberto.contreras@thisisgain.com"
 
 # Get build target.
