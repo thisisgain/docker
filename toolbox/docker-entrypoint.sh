@@ -7,7 +7,6 @@ if [ -n "$NODE_VERSION" ]; then
 
   # Check if versions are different (accounting for version format differences)
   if [[ "$CURRENT_VERSION" != "$NODE_VERSION"* ]]; then
-    echo "Switching from Node.js $CURRENT_VERSION to $NODE_VERSION"
     export NVM_DIR=/usr/local/.nvm
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 

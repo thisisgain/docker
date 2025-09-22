@@ -38,6 +38,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node.js version switching functionality
 - EB CLI python command not found error
 
+## [1.6.1]
+
+### Included Tools
+- AWS CLI: 2.30.5
+- AWS CDK: 2.1029.2
+- AWS Amplify: 14.0.1
+- EB CLI: 3.25
+- PHP: 8.3.25-fpm
+- NVM: 0.39.7
+  - Node: v20.18.1
+  - NPM: 10.8.2
+- Composer: 2.8.11
+- Python3: 3.13.5
+- Python2: 2.7.13
+- Ansible: 2.19.2
+- Acquia CLI: 2.48.0
+
+### Added
+- Updated PHP 8.3-fpm
+- Node.js version switching script
+
+### Changed
+- Improved NVM integration with system profile
+- Enhanced Node.js version management
+
 ## [1.6.0] - Previous Release
 
 ### Included Tools

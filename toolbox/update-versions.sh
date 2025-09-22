@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script to update tool versions in README.md and CHANGELOG.md
-# Usage: docker run --rm -v $(pwd):/workspace toolbox:1.7.0 /workspace/update-versions.sh [VERSION]
+# Usage: docker run --rm -v $(pwd):/workspace -w /workspace toolbox:1.7.0 /workspace/update-versions.sh [VERSION]
 
 README_FILE="README.md"
 CHANGELOG_FILE="CHANGELOG.md"
