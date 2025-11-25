@@ -1,4 +1,4 @@
-FROM php:8.4.12-fpm
+FROM php:8.3.28-fpm
 
 ARG TARGETPLATFORM
 

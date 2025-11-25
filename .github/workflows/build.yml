@@ -69,7 +69,6 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            thisisgain/${{ matrix.service }}:latest
             thisisgain/${{ matrix.service }}:${{ steps.get-version.outputs.VERSION }}
 
       - name: Update Docker Hub description
