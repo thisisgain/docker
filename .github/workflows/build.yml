@@ -31,7 +31,7 @@ jobs:
       - name: Set matrix
         id: set-matrix
         run: |
-          MATRIX=$(echo '{"service": ${{ steps.changed-dirs.outputs.matrix }}}')
+          MATRIX='{"service": ${{ steps.changed-dirs.outputs.matrix }}}'
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
   build:
