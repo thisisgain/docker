@@ -26,13 +26,23 @@ Each image directory contains a `version.txt` file that defines the current vers
 
 ### Image Tags
 
-When an image is built, it receives two tags:
-- `latest` - Always points to the most recent build
-- The version number from `version.txt` (e.g., `1.2.3`)
+When an image is built, it receives the version tag from `version.txt`. Optionally, if the second line of `version.txt` is `latest`, it will also be tagged as `latest`.
 
-For example, if `toolbox/version.txt` contains `1.2.3`, the published image will be tagged as:
-- `thisisgain/toolbox:latest`
+For example:
+```
+1.2.3
+latest
+```
+Will publish:
 - `thisisgain/toolbox:1.2.3`
+- `thisisgain/toolbox:latest`
+
+And a single-line `version.txt`:
+```
+8.3.30-fpm
+```
+Will publish only:
+- `thisisgain/php:8.3.30-fpm`
 
 ## How to Update an Existing Image
 

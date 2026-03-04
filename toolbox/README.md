@@ -9,18 +9,18 @@ This image is based on php 8.4-fpm
 Set of tools to run for building several kind of projects.
 
 Tools in this image:
-* aws cli: 2.30.3
-* aws cdk: 2.1029.1
-* aws amplify: 14.0.0
-* eb: 3.25
-* php: 8.4.12-fpm
+* aws cli: 2.34.1
+* aws cdk: 2.1109.0
+* aws amplify: 14.2.5
+* eb: 3.26
+* php: 8.4.18-fpm
 * nvm: 0.39.7
   * node: v20.18.1
   * npm: 10.8.2
-* composer: 2.8.11
+* composer: 2.9.5
 * python3: 3.13.5
-* ansible: 2.19.2
-* acli: 2.48.0
+* ansible: 2.20.3
+* acli: 2.59.0
 
 ## NVM
 

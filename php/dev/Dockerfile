@@ -1,4 +1,5 @@
-FROM thisisgain/php:8.3.28-fpm
+ARG PHP_VERSION=latest
+FROM thisisgain/php:${PHP_VERSION}
 
 # Install xdebug
 RUN pecl install xdebug \
