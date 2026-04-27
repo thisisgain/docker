@@ -9,8 +9,13 @@ on:
   workflow_dispatch:
     inputs:
       service:
-        description: 'Service to build (e.g. php, php/dev, toolbox)'
+        description: 'Service to build'
         required: true
+        type: choice
+        options:
+          - php
+          - php/dev
+          - toolbox
 
 jobs:
   detect-changes:
