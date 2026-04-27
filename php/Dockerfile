@@ -10,13 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   LIBDIR=$(case $TARGETPLATFORM in \
     linux/amd64) echo 'x86_64-linux-gnu';; \
     linux/arm64) echo 'aarch64-linux-gnu';; \
-    *) echo "unsupported architecture"; exit 1;; \
+    *) dpkg-architecture -qDEB_HOST_MULTIARCH;; \
   esac) && \
   docker-php-ext-configure gd --with-jpeg --with-webp && \
   docker-php-ext-configure ldap --with-libdir=lib/$LIBDIR/ && \
   docker-php-ext-install gd mbstring opcache pdo pdo_mysql pdo_pgsql zip ldap bz2 soap bcmath && \
   pecl install memcached imagick && \
   docker-php-ext-enable memcached imagick && \
+  apt-get purge -y libpng-dev libjpeg-dev libonig-dev libzip-dev libpq-dev libldap2-dev \
+    libbz2-dev libwebp-dev libmagickwand-dev libmemcached-dev libxml2-dev && \
   apt-get autoremove -y && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 # set recommended opcache settings

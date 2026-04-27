@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - '**/version.txt'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to build (e.g. php, php/dev, toolbox)'
+        required: true
 
 jobs:
   detect-changes:
@@ -20,11 +25,15 @@ jobs:
       - name: Detect changed images
         id: set-matrix
         run: |
-          CHANGED=$(git diff --name-only HEAD^ HEAD \
-            | grep 'version.txt' \
-            | sed 's|/version.txt||' \
-            | sort | uniq \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CHANGED=$(echo '${{ inputs.service }}' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            CHANGED=$(git diff --name-only HEAD^ HEAD \
+              | grep 'version.txt' \
+              | sed 's|/version.txt||' \
+              | sort | uniq \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
           echo "matrix={\"service\":$CHANGED}" >> $GITHUB_OUTPUT
 
   build:
