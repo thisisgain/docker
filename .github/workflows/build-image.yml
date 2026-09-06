@@ -32,7 +32,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Two real axes -> full service x platform cross-product, so every
+        # service builds BOTH arches (each as its own job on a native runner).
         service: ${{ fromJson(inputs.matrix).service }}
+        platform:
+          - linux/amd64
+          - linux/arm64
+        # Map each platform to its native runner. `include` only adds keys to
+        # existing combinations here; it does not create new ones.
         include:
           - platform: linux/amd64
             runner: ubuntu-latest
