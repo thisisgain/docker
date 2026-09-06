@@ -54,15 +54,24 @@ jobs:
       - name: Get build config
         id: cfg
         run: |
-          VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
-          # Derive image name: use last path segment (e.g. php/dev -> php-dev, php -> php)
-          IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
+          SERVICE="${{ matrix.service }}"
+          VERSION=$(sed -n '1p' "$SERVICE/version.txt" | tr -d '[:space:]')
+          # Docker Hub repo = the TOP-LEVEL folder only. Subfolders are variants
+          # of the same repo published under a different tag, NOT separate repos.
+          #   php      -> thisisgain/php
+          #   php/dev  -> thisisgain/php  (tag comes from php/dev/version.txt)
+          IMAGE="${SERVICE%%/*}"
           echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
-          # PHP_VERSION is the base tag to build FROM. For a dependent image
-          # (e.g. php/dev) that is the parent dir's version (php/version.txt).
-          # For a top-level image the parent has no version.txt, so fall back to
-          # this image's own version.
-          BASE_DIR=$(dirname "${{ matrix.service }}")
+          # The tag is whatever the variant's own version.txt says (e.g.
+          # 8.4.25-fpm-dev), so the folder name is reflected in the tag you set.
+          # A slug of the full path keeps per-variant build artifacts distinct.
+          SLUG=$(echo "$SERVICE" | tr '/' '-')
+          echo "SLUG=$SLUG" >> $GITHUB_OUTPUT
+          # PHP_VERSION is the base tag to build FROM. For a variant (e.g.
+          # php/dev) that is the parent dir's version (php/version.txt). For a
+          # top-level image the parent has no version.txt, so fall back to this
+          # image's own version.
+          BASE_DIR=$(dirname "$SERVICE")
           if [ -f "$BASE_DIR/version.txt" ]; then
             BASE_VERSION=$(sed -n '1p' "$BASE_DIR/version.txt" | tr -d '[:space:]')
           else
@@ -104,7 +113,9 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v7
         with:
-          name: digests-${{ steps.cfg.outputs.IMAGE }}-${{ steps.cfg.outputs.PLATFORM_PAIR }}
+          # Keyed on the full-path SLUG (e.g. php, php-dev) so php and php/dev
+          # keep separate digests even though they push to the same repo.
+          name: digests-${{ steps.cfg.outputs.SLUG }}-${{ steps.cfg.outputs.PLATFORM_PAIR }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -126,12 +137,16 @@ jobs:
       - name: Get tags
         id: cfg
         run: |
-          VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
-          IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
+          SERVICE="${{ matrix.service }}"
+          VERSION=$(sed -n '1p' "$SERVICE/version.txt" | tr -d '[:space:]')
+          # Repo = top-level folder; variants push here under a different tag.
+          IMAGE="${SERVICE%%/*}"
+          SLUG=$(echo "$SERVICE" | tr '/' '-')
           echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
+          echo "SLUG=$SLUG" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           # Tag as latest only if second line of version.txt is 'latest'
-          if [ "$(sed -n '2p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')" = "latest" ]; then
+          if [ "$(sed -n '2p' "$SERVICE/version.txt" | tr -d '[:space:]')" = "latest" ]; then
             echo "TAGS=thisisgain/$IMAGE:latest,thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
           else
             echo "TAGS=thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
@@ -141,10 +156,10 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
-          # Anchor to the per-platform suffix so e.g. the "php" merge cannot
-          # accidentally match "php-dev" digests (digests-php-* would otherwise
-          # also match digests-php-dev-*).
-          pattern: digests-${{ steps.cfg.outputs.IMAGE }}-linux-*
+          # Match this variant's own digests by its full-path slug (e.g.
+          # digests-php-dev-linux-*), so the php and php/dev merges stay separate
+          # even though both push to the thisisgain/php repo.
+          pattern: digests-${{ steps.cfg.outputs.SLUG }}-linux-*
           merge-multiple: true
 
       - uses: docker/login-action@v4
