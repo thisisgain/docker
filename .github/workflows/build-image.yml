@@ -40,9 +40,9 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Get build config
         id: cfg
@@ -65,14 +65,14 @@ jobs:
           # Sanitized platform string for artifact naming (linux/amd64 -> linux-amd64)
           echo "PLATFORM_PAIR=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./${{ matrix.service }}
           platforms: ${{ matrix.platform }}
@@ -80,6 +80,11 @@ jobs:
             PHP_VERSION=${{ steps.cfg.outputs.BASE_VERSION }}
           # Push by digest only; the merge job assigns the real tags.
           outputs: type=image,name=${{ env.REGISTRY_IMAGE_PREFIX }}/${{ steps.cfg.outputs.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # Disable provenance/SBOM attestations. They add an "unknown/unknown"
+          # entry to the pushed digests, which corrupts the merged manifest
+          # (stray platform + a missing real arch). We only want the image.
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ matrix.platform }}
 
@@ -90,7 +95,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: digests-${{ steps.cfg.outputs.IMAGE }}-${{ steps.cfg.outputs.PLATFORM_PAIR }}
           path: /tmp/digests/*
@@ -107,9 +112,9 @@ jobs:
       matrix:
         service: ${{ fromJson(inputs.matrix).service }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Get tags
         id: cfg
@@ -126,13 +131,16 @@ jobs:
           fi
 
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
-          pattern: digests-${{ steps.cfg.outputs.IMAGE }}-*
+          # Anchor to the per-platform suffix so e.g. the "php" merge cannot
+          # accidentally match "php-dev" digests (digests-php-* would otherwise
+          # also match digests-php-dev-*).
+          pattern: digests-${{ steps.cfg.outputs.IMAGE }}-linux-*
           merge-multiple: true
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -140,6 +148,16 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
+          set -euo pipefail
+          # We build exactly two architectures (amd64 + arm64). If we don't have
+          # two digests here, the manifest would be incomplete (e.g. a missing
+          # arch), so fail loudly instead of pushing a broken single-arch image.
+          COUNT=$(ls -1 | wc -l | tr -d '[:space:]')
+          echo "Found $COUNT digest(s):"; ls -1
+          if [ "$COUNT" -ne 2 ]; then
+            echo "::error::Expected 2 arch digests (amd64+arm64) but found $COUNT. Refusing to push an incomplete manifest."
+            exit 1
+          fi
           # Build a -t flag per tag, then reference each arch by digest.
           TAG_FLAGS=$(echo "${{ steps.cfg.outputs.TAGS }}" | tr ',' '\n' | sed 's/^/-t /' | tr '\n' ' ')
           docker buildx imagetools create $TAG_FLAGS \
