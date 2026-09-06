@@ -3,6 +3,11 @@ name: Build Image (reusable)
 # Reusable workflow that builds and pushes a single matrix of images.
 # Called once per "tier" by build.yml so that dependent images (e.g. php/dev)
 # only start after their base image (php) has been pushed.
+#
+# Each architecture is built on its OWN native runner (amd64 on ubuntu-latest,
+# arm64 on ubuntu-24.04-arm) to avoid slow QEMU emulation. The per-arch images
+# are pushed by digest, then a merge job stitches them into one multi-arch
+# manifest under the real tags.
 
 on:
   workflow_call:
@@ -15,26 +20,32 @@ on:
       DOCKERHUB_TOKEN:
         required: true
 
+env:
+  REGISTRY_IMAGE_PREFIX: thisisgain
+
 jobs:
+  # Build one architecture of one service natively, push by digest only.
   build:
-    runs-on: ubuntu-latest
-    # Skip cleanly when the tier has no services to build.
     if: ${{ fromJson(inputs.matrix).service[0] != null }}
     strategy:
-      matrix: ${{ fromJson(inputs.matrix) }}
       fail-fast: false
+      matrix:
+        service: ${{ fromJson(inputs.matrix).service }}
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: docker/setup-qemu-action@v3
-
       - uses: docker/setup-buildx-action@v3
 
-      - name: Get version
-        id: get-version
+      - name: Get build config
+        id: cfg
         run: |
           VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           # Derive image name: use last path segment (e.g. php/dev -> php-dev, php -> php)
           IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
           echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
@@ -49,6 +60,62 @@ jobs:
             BASE_VERSION="$VERSION"
           fi
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+          # Sanitized platform string for artifact naming (linux/amd64 -> linux-amd64)
+          echo "PLATFORM_PAIR=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            PHP_VERSION=${{ steps.cfg.outputs.BASE_VERSION }}
+          # Push by digest only; the merge job assigns the real tags.
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE_PREFIX }}/${{ steps.cfg.outputs.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ matrix.platform }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ steps.cfg.outputs.IMAGE }}-${{ steps.cfg.outputs.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Combine per-arch digests into one multi-arch manifest under the real tags.
+  merge:
+    needs: build
+    if: ${{ fromJson(inputs.matrix).service[0] != null }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(inputs.matrix).service }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Get tags
+        id: cfg
+        run: |
+          VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
+          IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
+          echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           # Tag as latest only if second line of version.txt is 'latest'
           if [ "$(sed -n '2p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')" = "latest" ]; then
             echo "TAGS=thisisgain/$IMAGE:latest,thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
@@ -56,20 +123,29 @@ jobs:
             echo "TAGS=thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
           fi
 
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ steps.cfg.outputs.IMAGE }}-*
+          merge-multiple: true
+
       - uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./${{ matrix.service }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            PHP_VERSION=${{ steps.get-version.outputs.BASE_VERSION }}
-          tags: ${{ steps.get-version.outputs.TAGS }}
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          # Build a -t flag per tag, then reference each arch by digest.
+          TAG_FLAGS=$(echo "${{ steps.cfg.outputs.TAGS }}" | tr ',' '\n' | sed 's/^/-t /' | tr '\n' ' ')
+          docker buildx imagetools create $TAG_FLAGS \
+            $(printf 'thisisgain/${{ steps.cfg.outputs.IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect thisisgain/${{ steps.cfg.outputs.IMAGE }}:${{ steps.cfg.outputs.VERSION }}
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v4
@@ -77,5 +153,5 @@ jobs:
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: thisisgain/${{ steps.get-version.outputs.IMAGE }}
+          repository: thisisgain/${{ steps.cfg.outputs.IMAGE }}
           readme-filepath: ./${{ matrix.service }}/README.md
