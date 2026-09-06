@@ -1,0 +1,81 @@
+name: Build Image (reusable)
+
+# Reusable workflow that builds and pushes a single matrix of images.
+# Called once per "tier" by build.yml so that dependent images (e.g. php/dev)
+# only start after their base image (php) has been pushed.
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        description: 'JSON matrix object, e.g. {"service":["php"]}'
+        required: true
+        type: string
+    secrets:
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Skip cleanly when the tier has no services to build.
+    if: ${{ fromJson(inputs.matrix).service[0] != null }}
+    strategy:
+      matrix: ${{ fromJson(inputs.matrix) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          # Derive image name: use last path segment (e.g. php/dev -> php-dev, php -> php)
+          IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
+          echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
+          # PHP_VERSION is the base tag to build FROM. For a dependent image
+          # (e.g. php/dev) that is the parent dir's version (php/version.txt).
+          # For a top-level image the parent has no version.txt, so fall back to
+          # this image's own version.
+          BASE_DIR=$(dirname "${{ matrix.service }}")
+          if [ -f "$BASE_DIR/version.txt" ]; then
+            BASE_VERSION=$(sed -n '1p' "$BASE_DIR/version.txt" | tr -d '[:space:]')
+          else
+            BASE_VERSION="$VERSION"
+          fi
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_OUTPUT
+          # Tag as latest only if second line of version.txt is 'latest'
+          if [ "$(sed -n '2p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')" = "latest" ]; then
+            echo "TAGS=thisisgain/$IMAGE:latest,thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "TAGS=thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            PHP_VERSION=${{ steps.get-version.outputs.BASE_VERSION }}
+          tags: ${{ steps.get-version.outputs.TAGS }}
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        if: hashFiles(format('{0}/README.md', matrix.service)) != ''
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: thisisgain/${{ steps.get-version.outputs.IMAGE }}
+          readme-filepath: ./${{ matrix.service }}/README.md

@@ -1,4 +1,4 @@
-FROM php:8.4.20-fpm
+FROM php:8.4.25-fpm
 
 ARG TARGETPLATFORM
 
@@ -17,8 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   docker-php-ext-install gd mbstring opcache pdo pdo_mysql pdo_pgsql zip ldap bz2 soap bcmath && \
   pecl install memcached imagick && \
   docker-php-ext-enable memcached imagick && \
-  apt-get purge -y libpng-dev libjpeg-dev libonig-dev libzip-dev libpq-dev libldap2-dev \
-    libbz2-dev libwebp-dev libmagickwand-dev libmemcached-dev libxml2-dev && \
+  apt-get purge -y libpng-dev libjpeg-dev libmagickwand-dev && \
   apt-get autoremove -y && rm -rf /var/lib/apt/lists/* /tmp/pear
 
 # set recommended opcache settings

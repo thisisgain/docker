@@ -22,7 +22,8 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      base-matrix: ${{ steps.set-matrix.outputs.base-matrix }}
+      dependent-matrix: ${{ steps.set-matrix.outputs.dependent-matrix }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -40,56 +41,30 @@ jobs:
               | sort | uniq \
               | jq -R -s -c 'split("\n") | map(select(length > 0))')
           fi
-          echo "matrix={\"service\":$CHANGED}" >> $GITHUB_OUTPUT
+          # Dependent images build on top of a base image in this repo, so they
+          # must build only after their base has been pushed. "php/dev" depends
+          # on "php". Split the changed services into two groups.
+          BASE=$(echo "$CHANGED" | jq -c 'map(select(. != "php/dev"))')
+          DEPENDENT=$(echo "$CHANGED" | jq -c 'map(select(. == "php/dev"))')
+          echo "base-matrix={\"service\":$BASE}" >> $GITHUB_OUTPUT
+          echo "dependent-matrix={\"service\":$DEPENDENT}" >> $GITHUB_OUTPUT
 
-  build:
-    runs-on: ubuntu-latest
+  # Base images first (everything except php/dev).
+  build-base:
     needs: detect-changes
-    strategy:
-      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v6
+    uses: ./.github/workflows/build-image.yml
+    with:
+      matrix: ${{ needs.detect-changes.outputs.base-matrix }}
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Get version
-        id: get-version
-        run: |
-          VERSION=$(sed -n '1p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          # Derive image name: use last path segment (e.g. php/dev -> php-dev, php -> php)
-          IMAGE=$(echo "${{ matrix.service }}" | tr '/' '-')
-          echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
-          # Tag as latest only if second line of version.txt is 'latest'
-          if [ "$(sed -n '2p' ${{ matrix.service }}/version.txt | tr -d '[:space:]')" = "latest" ]; then
-            echo "TAGS=thisisgain/$IMAGE:latest,thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "TAGS=thisisgain/$IMAGE:$VERSION" >> $GITHUB_OUTPUT
-          fi
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./${{ matrix.service }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            PHP_VERSION=${{ steps.get-version.outputs.VERSION }}
-          tags: ${{ steps.get-version.outputs.TAGS }}
-
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
-        if: hashFiles(format('{0}/README.md', matrix.service)) != ''
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: thisisgain/${{ steps.get-version.outputs.IMAGE }}
-          readme-filepath: ./${{ matrix.service }}/README.md
+  # Dependent images (php/dev) after the base has been pushed. Still runs when
+  # only php/dev changed (build-base skips), but not if build-base failed.
+  build-dependent:
+    needs: [detect-changes, build-base]
+    if: ${{ always() && needs.build-base.result != 'failure' }}
+    uses: ./.github/workflows/build-image.yml
+    with:
+      matrix: ${{ needs.detect-changes.outputs.dependent-matrix }}
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
