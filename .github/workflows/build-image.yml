@@ -17,6 +17,8 @@ on:
         required: true
         type: string
     secrets:
+      # Needs full Read/Write/Delete scope: the "update description" API rejects
+      # push-only tokens with a 403.
       DOCKERHUB_TOKEN:
         required: true
 
@@ -147,9 +149,12 @@ jobs:
         run: |
           docker buildx imagetools inspect thisisgain/${{ steps.cfg.outputs.IMAGE }}:${{ steps.cfg.outputs.VERSION }}
 
+      # Cosmetic README sync. Never fail the job over it: the image is already
+      # built and pushed by this point.
       - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@v5
         if: hashFiles(format('{0}/README.md', matrix.service)) != ''
+        continue-on-error: true
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
