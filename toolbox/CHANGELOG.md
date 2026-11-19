@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0]
+
+### Included Tools
+- AWS CLI: 2.41.1
+- AWS CDK: 2.1149.0
+- AWS Amplify: 14.6.0
+- EB CLI: 3.27.7
+- PHP: 8.4.28-fpm
+- NVM: 0.41.0
+  - Node: v24.22.3
+  - NPM: 11.19.1
+- Composer: 2.11.2
+- Python3: 3.13.5
+- Python2: 2.7.13
+- Ansible: 2.22.0
+- Acquia CLI: 4.4.0
+
+### Changed
+- All tools updated to their latest versions
+- NVM updated from 0.39.7 to 0.41.0
+- Default Node.js updated from 20.18.1 to 24.22.3 (LTS)
+
 ## [1.7.0]
 
 ### Included Tools

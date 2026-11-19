@@ -26,11 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install NVM, Node.js and NPM
 ENV NVM_DIR=/usr/local/.nvm
-ARG DEFAULT_NODE_VERSION=20.18.1
+ARG DEFAULT_NODE_VERSION=24.22.3
 ENV NODE_VERSION=${DEFAULT_NODE_VERSION}
 
 RUN mkdir -p $NVM_DIR && \
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh | bash && \
     . $NVM_DIR/nvm.sh && \
     nvm install $NODE_VERSION && \
     nvm alias default $NODE_VERSION && \
